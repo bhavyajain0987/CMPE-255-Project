@@ -1,6 +1,10 @@
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
+from drain3 import TemplateMiner
+import scipy.sparse as sp
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import PCA
 
 # Load & clean raw lines
 LOG_FILE = "raw_data/BGL_2k.log"
@@ -38,3 +42,31 @@ for L in lines:
 
 df = pd.DataFrame(records)
 print(f"Parsed {len(df)} log entries.")
+
+# Template extraction via Drain3
+miner = TemplateMiner()
+template_ids = []
+for msg in df['message']:
+    info = miner.add_log_message(msg)
+    # accommodate either key name
+    tid  = info.get("cluster_id", info.get("clusterId"))
+    template_ids.append(tid)
+
+df['template_id'] = template_ids
+
+# Feature Engineering
+# Text: TF-IDF on the raw message
+tfidf = TfidfVectorizer(max_features=500)
+X_text = tfidf.fit_transform(df['message'])
+
+# Categorical: node, component, severity, template_id -> one-hot
+X_cat = pd.get_dummies(
+    df[['node','component','severity','template_id']].astype(str),
+    drop_first=True
+)
+X_cat_sparse = sp.csr_matrix(X_cat.values)
+
+# Temporal: inter-arrival (seconds) + hour-of-day
+df['delta_s'] = df['dt'].diff().dt.total_seconds().fillna(0)
+df['hour']    = df['dt'].dt.hour
+X_time = sp.csr_matrix(df[['delta_s','hour']].values)
