@@ -70,3 +70,15 @@ X_cat_sparse = sp.csr_matrix(X_cat.values)
 df['delta_s'] = df['dt'].diff().dt.total_seconds().fillna(0)
 df['hour']    = df['dt'].dt.hour
 X_time = sp.csr_matrix(df[['delta_s','hour']].values)
+
+# Assemble & save feature matrix
+X = sp.hstack([X_text, X_cat_sparse, X_time], format='csr')
+print("Feature matrix shape:", X.shape)
+
+# Records CSV (no message text)
+df.drop(columns=['message']).to_csv("outputs/stream1_records.csv", index=False)
+
+# Raw feature matrix (sparse .npz) + TFIDF meta
+sp.save_npz("outputs/stream1_features.npz", X)
+pd.DataFrame({'feature': tfidf.get_feature_names_out()}) \
+  .to_csv("outputs/tfidf_features.csv", index=False)
