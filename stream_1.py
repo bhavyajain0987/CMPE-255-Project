@@ -5,6 +5,7 @@ from drain3 import TemplateMiner
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA
+import umap
 
 # Load & clean raw lines
 LOG_FILE = "raw_data/BGL_2k.log"
@@ -82,3 +83,33 @@ df.drop(columns=['message']).to_csv("outputs/stream1_records.csv", index=False)
 sp.save_npz("outputs/stream1_features.npz", X)
 pd.DataFrame({'feature': tfidf.get_feature_names_out()}) \
   .to_csv("outputs/tfidf_features.csv", index=False)
+
+# Dimensionality Reduction
+pca = PCA(n_components=50)
+Z50 = pca.fit_transform(X.toarray())
+
+umapper = umap.UMAP(n_components=2, random_state=42)
+Z2   = umapper.fit_transform(Z50)
+
+# PCA‐50 CSV
+pd.DataFrame(Z50, columns=[f"PC{i+1}" for i in range(50)]) \
+  .to_csv("outputs/pca50.csv", index=False)
+
+# UMAP‐2 CSV
+pd.DataFrame(Z2, columns=["UMAP1","UMAP2"]) \
+  .to_csv("outputs/umap2d.csv", index=False)
+
+# Plot and save
+plt.figure(figsize=(6,5))
+plt.scatter(Z2[:,0], Z2[:,1], s=3, alpha=0.6)
+plt.title("UMAP(PCA(X)) on BGL logs")
+plt.xlabel("UMAP1"); plt.ylabel("UMAP2")
+plt.tight_layout()
+plt.savefig("outputs/stream1_umap.png", dpi=150)
+plt.show()
+
+print("Stream 1 pipeline complete. Outputs in /outputs:")
+print("  - stream1_records.csv")
+print("  - stream1_features.npz + tfidf_features.csv")
+print("  - pca50.csv, umap2d.csv")
+print("  - stream1_umap.png")
