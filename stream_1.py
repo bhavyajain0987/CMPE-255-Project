@@ -1,4 +1,5 @@
 import re
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 from drain3 import TemplateMiner
@@ -6,6 +7,8 @@ import scipy.sparse as sp
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA
 import umap
+
+logging.getLogger("drain3").setLevel(logging.CRITICAL)
 
 # Load & clean raw lines
 LOG_FILE = "raw_data/BGL_2k.log"
