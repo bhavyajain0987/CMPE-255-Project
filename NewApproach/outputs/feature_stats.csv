@@ -1,0 +1,10 @@
+feature,mean,std
+n_events,0.0,1.0
+-1,0.0,1.0
+FATAL,-0.0,1.0
+n_failures,-0.0,1.0
+hour,0.0,1.0
+INFO,0.0,1.0
+ERROR,0.0,1.0
+SEVERE,0.0,1.0
+WARNING,-0.0,1.0
