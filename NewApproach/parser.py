@@ -25,7 +25,9 @@ def parse_line(line: str) -> dict | None:
         return None
     try:
         epoch     = int(parts[0])
-        node_id   = parts[2]
+        node_id = parts[2]
+        if not node_id or node_id.upper() == 'NULL':
+            return None
         ts2       = parts[3]
         component = parts[6]
         severity  = parts[7].upper()
