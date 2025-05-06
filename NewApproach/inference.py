@@ -1,8 +1,8 @@
-# Updated inference.py with sample output preview
+# Updated inference.py with CloudWatch alert integration for 5 unique node IDs
 
 """
 Run inference using final models on PCA features from featex.py.
-Now prints first few rows of the predictions for quick inspection.
+Now sends alerts to AWS CloudWatch for predicted failures.
 
 Usage:
     python inference.py \
@@ -16,6 +16,46 @@ import argparse
 import pandas as pd
 import joblib
 import pathlib
+import boto3
+import time
+
+# CloudWatch setup
+LOG_GROUP_NAME = 'BGLAlerts'
+LOG_STREAM_NAME = 'FrequentPatternWarnings'
+
+# Initialize CloudWatch Logs client
+client = boto3.client('logs', region_name='us-east-1')  # Change to your region
+
+# Create log group and log stream if they don't exist
+try:
+    client.create_log_group(logGroupName=LOG_GROUP_NAME)
+except client.exceptions.ResourceAlreadyExistsException:
+    pass
+
+try:
+    client.create_log_stream(logGroupName=LOG_GROUP_NAME, logStreamName=LOG_STREAM_NAME)
+except client.exceptions.ResourceAlreadyExistsException:
+    pass
+
+def send_log_event(message):
+    """Send a log event to AWS CloudWatch."""
+    streams = client.describe_log_streams(logGroupName=LOG_GROUP_NAME, logStreamNamePrefix=LOG_STREAM_NAME)
+    upload_sequence_token = streams['logStreams'][0].get('uploadSequenceToken')
+
+    kwargs = {
+        'logGroupName': LOG_GROUP_NAME,
+        'logStreamName': LOG_STREAM_NAME,
+        'logEvents': [{
+            'timestamp': int(time.time() * 1000),
+            'message': message
+        }]
+    }
+
+    if upload_sequence_token:
+        kwargs['sequenceToken'] = upload_sequence_token
+
+    response = client.put_log_events(**kwargs)
+    print("✅ Alert sent to CloudWatch:", response)
 
 def main(records_csv, features_csv, models_dir, threshold):
     # 1) Load metadata and PCA features
@@ -52,7 +92,22 @@ def main(records_csv, features_csv, models_dir, threshold):
     # 6) Print preview
     print("First rows of predictions.csv:")
     print(out.head())
-    
+
+    # 7) Send alerts to CloudWatch for 5 unique node IDs with p_fail > 0.65
+    filtered = out[(out['alert'] == 1) & (out['p_fail'] > 0.65)]
+    unique_nodes = filtered['node_id'].unique()[:5]  # Get up to 5 unique node IDs
+
+    for node_id in unique_nodes:
+        row = filtered[filtered['node_id'] == node_id].iloc[0]  # Get the first row for this node
+        message = (
+            f"ALERT: Predicted failure detected!\n"
+            f"Node ID: {row['node_id']}\n"
+            f"Window Start: {row['window_start']}\n"
+            f"Failure Probability: {row['p_fail']:.2f}\n"
+            f"Estimated Time to Failure (minutes): {row['eta_min']:.2f}"
+        )
+        send_log_event(message)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--records',  required=True,
